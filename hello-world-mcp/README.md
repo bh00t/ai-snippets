@@ -32,9 +32,10 @@ Windows aggressively buffers pipes to save memory. When the server sends JSON ba
 Standard Python asyncio loops on Windows struggle with subprocess pipes.
 * **The Fix:** We force the client to use the WindowsProactorEventLoopPolicy to ensure stable communication.
 
-### 3. Database Thread Deadlocks (check_same_thread)
-FastMCP runs tools in background worker threads. Standard database connections often crash when touched by a thread that didn't create them.
-* **The Fix:** We use SQLite with check_same_thread=False to allow background threads to query the file safely.
+### 3. The DuckDB Pivot (Analytical vs. Application DBs)
+* **The Challenge:** We initially built the server using DuckDB. However, DuckDB is an analytical engine (OLAP) with strict C-level thread-safety locks. Because FastMCP executes tools in background worker threads, DuckDB would seize up and cause silent deadlocks on the Windows event loop.
+* **The Decision:** Debugging low-level C++ thread locks wasn't the main motive—building a functional MCP agent was. We pragmatically pivoted to SQLite, which is natively built for application workloads (OLTP).
+* **The Fix:** We used SQLite with `check_same_thread=False` to safely allow background MCP threads to query the file without crashing the main process.
 
 ### 4. Schema Translation (OpenAPI vs JSON)
 Gemini requires **OpenAPI** formatting (UPPERCASE types), while MCP provides **JSON Schema** (lowercase types).
